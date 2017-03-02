@@ -125,11 +125,13 @@ public class RELDAT_Socket {
                         //If ACK of SYNACK received
                         if ((reldat_packet.getType() == RELDAT_Packet.TYPE.ACK) && (seq == reldat_packet.getAck())) {
                             state = CONNECTION_STATE.ESTABLISHED;
+                            ack += reldat_packet.getLength();
                             break;
                             //If the ACK of SYNACK is lost
                         } else if(reldat_packet.getType() == RELDAT_Packet.TYPE.DATA){
                             state = CONNECTION_STATE.ESTABLISHED;
-
+                            ack += reldat_packet.getLength();
+                            //Add code to store data and send ACK
                         }
                     }
                     break;
@@ -142,14 +144,23 @@ public class RELDAT_Socket {
                 }
             }
         }
+        System.out.println("---SERVER STATUS---");
+        System.out.println("localPort:" + s.getLocalPort());
+        System.out.println("localAddress" + Inet4Address.getLocalHost());
+        System.out.println("Seq:" + seq);
+        System.out.println("Ack:" + ack);
+        System.out.println("RecvWindown:" + recvWndwn);
+        System.out.println("SenderWindow:" + senderWndwn);
+        System.out.println("remoteAddress:" + remoteAddr.toString());
+        System.out.println("remotePort:" + remotePort);
     }
 
     public void connect(String serverAddr, int serverPort) throws IOException,ClassNotFoundException {
         byte[] buffer = new byte[1];
-        this.seq = 0;
         this.remoteAddr = InetAddress.getByName(serverAddr);
         this.remotePort = serverPort;
         RELDAT_Packet reldat_packet = new RELDAT_Packet(buffer,seq,ack, RELDAT_Packet.TYPE.SYN,recvWndwn);
+        seq+=1;
         DatagramPacket p = Pack(reldat_packet);
         s.setSoTimeout(3000);
         int retry = 0;
@@ -166,8 +177,8 @@ public class RELDAT_Socket {
                     remoteAddr = p.getAddress();
                     remotePort = p.getPort();
                 }
-                seq += 1;
                 reldat_packet = new RELDAT_Packet(new byte[1], seq, ack, RELDAT_Packet.TYPE.ACK, recvWndwn);
+                seq+=1;
                 p = Pack(reldat_packet);
                 s.send(p);
                 state = CONNECTION_STATE.ESTABLISHED;
@@ -175,6 +186,7 @@ public class RELDAT_Socket {
             }catch (SocketTimeoutException e){
                 if(retry < 3) {
                     System.out.println("Timeout! Try to resend SYN...");
+                    retry++;
                 } else {
                     System.out.println("Closing the connection");
                     state = CONNECTION_STATE.CLOSED;
@@ -182,6 +194,15 @@ public class RELDAT_Socket {
                 }
             }
         }
+        System.out.println("---CLIENT STATUS---");
+        System.out.println("localPort:" + s.getLocalPort());
+        System.out.println("localAddress" + Inet4Address.getLocalHost());
+        System.out.println("Seq:" + seq);
+        System.out.println("Ack:" + ack);
+        System.out.println("RecvWindown:" + recvWndwn);
+        System.out.println("SenderWindow:" + senderWndwn);
+        System.out.println("remoteAddress:" + remoteAddr.toString());
+        System.out.println("remotePort:" + remotePort);
     }
 
     /**
@@ -191,6 +212,8 @@ public class RELDAT_Socket {
      */
     public RELDAT_Socket(int localPort)throws SocketException{
         s = new DatagramSocket(localPort);
+        seq = 0;
+        ack = 0;
         state = CONNECTION_STATE.CLOSED;
     }
 //hello
