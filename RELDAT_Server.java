@@ -1,5 +1,5 @@
 import java.io.IOException;
-import java.net.SocketException;
+import java.net.Inet4Address;
 
 public class RELDAT_Server {
     public static void main(String[] args) throws NumberFormatException, IOException,ClassNotFoundException{
@@ -13,6 +13,7 @@ public class RELDAT_Server {
             s = new RELDAT_Socket(port);
             s.setRecvWndwn(recvWndwn);
         }
+        System.out.println("Server started: " + Inet4Address.getLocalHost() + ":" + s.getPort());
         s.accept();
         System.out.println("Connection established");
     }
