@@ -1,22 +1,27 @@
 import java.io.*;
-import java.net.DatagramPacket;
-import java.net.DatagramSocket;
-import java.net.InetAddress;
-import java.net.SocketException;
+import java.net.*;
 import java.util.ArrayList;
 
-/**
- * Created by David Nguyen on 3/2/2017.
- */
+
 public class RELDAT_Socket {
     private static int MSS = 1000; //Maximum segment size
     private int seq;    //Sequence number
-    private int ack;    //Acknowledge number
-    private int wndwn;  // Window size
+    private int ack;    //Acknowledge number = sender seq
+    private int recvWndwn;  // Receiver's window size
+    private int senderWndwn; // Sender's window size
     private DatagramSocket s;
-    private int local1Port;
     private InetAddress remoteAddr;
     private int remotePort;
+    private CONNECTION_STATE state;
+    public enum CONNECTION_STATE {LISTEN, ESTABLISHED, CLOSED}
+
+    public int getRecvWndwn() {
+        return recvWndwn;
+    }
+
+    public void setRecvWndwn(int recvWndwn) {
+        this.recvWndwn = recvWndwn;
+    }
 
     /**
      * Wrap RELDAT_packet inside a DatagramPacket
@@ -43,17 +48,18 @@ public class RELDAT_Socket {
     }
 
     /**
-     * Split byte array data into packets
+     * Split byte array data into packets for transferring over UDP
      * @param data
      * @return
      */
-
     private ArrayList<DatagramPacket> Packetize(byte[] data) throws IOException{
         ArrayList<DatagramPacket> packets = new ArrayList<>();
+        //If data size less than MSS then put everything into 1 packet
         if(data.length  < MSS) {
-            RELDAT_Packet reldat_packet = new RELDAT_Packet(data,seq,ack, RELDAT_Packet.TYPE.DATA,wndwn);
+            RELDAT_Packet reldat_packet = new RELDAT_Packet(data,seq,ack, RELDAT_Packet.TYPE.DATA,recvWndwn);
             DatagramPacket p = Pack(reldat_packet);
             packets.add(p);
+            //Else, split data into multiple packets
         } else {
             byte[] buffer;
             int i = 0;
@@ -62,12 +68,12 @@ public class RELDAT_Socket {
                 if(i + MSS < data.length) {
                     buffer = new byte[MSS];
                     System.arraycopy(data, i, buffer, 0, MSS);
-                    reldat_packet = new RELDAT_Packet(buffer, seq, ack, RELDAT_Packet.TYPE.DATA, wndwn);
+                    reldat_packet = new RELDAT_Packet(buffer, seq, ack, RELDAT_Packet.TYPE.DATA, recvWndwn);
                     seq += MSS;
                 } else{
                     buffer = new byte[data.length - i];
                     System.arraycopy(data, i, buffer, 0, data.length - i);
-                    reldat_packet = new RELDAT_Packet(buffer,seq, ack, RELDAT_Packet.TYPE.DATA,wndwn);
+                    reldat_packet = new RELDAT_Packet(buffer,seq, ack, RELDAT_Packet.TYPE.DATA,recvWndwn);
                     seq = data.length;
                 }
                 DatagramPacket p = Pack(reldat_packet);
@@ -77,8 +83,57 @@ public class RELDAT_Socket {
         }
         return packets;
     }
-    
 
+    /**
+     * Establish a reliable connection using 3-way handshake
+     * @throws IOException
+     * @throws ClassNotFoundException
+     */
+    public void accept() throws IOException, ClassNotFoundException {
+        state = CONNECTION_STATE.LISTEN;
+        byte[] buffer = new byte[MSS];
+        DatagramPacket p = new DatagramPacket(buffer,buffer.length);
+        while(true) {
+            s.receive(p); // Wait for connection request
+            RELDAT_Packet reldat_packet = Unpack(p);
+            //If SYN request received
+            if (reldat_packet.getType() == RELDAT_Packet.TYPE.SYN) {
+                ack = reldat_packet.getSeq() + reldat_packet.getLength();
+                senderWndwn = reldat_packet.getWndwn();
+                remoteAddr = p.getAddress();
+                remotePort = p.getPort();
+
+                reldat_packet = new RELDAT_Packet(new byte[1], seq, ack, RELDAT_Packet.TYPE.SYNACK, recvWndwn);
+                seq += 1;
+                p = Pack(reldat_packet);
+                s.setSoTimeout(5000); // Set timout for 5s
+                int retry = 0;
+                //Wait and resend SYNACK when needed
+                while(true) {
+                    try {
+                        s.send(p);
+                        buffer = new byte[MSS];
+                        p = new DatagramPacket(buffer, buffer.length);
+                        while(true) {
+                            s.receive(p);
+                            //If ACK of SYNACK received
+                            if ((reldat_packet.getType() == RELDAT_Packet.TYPE.ACK) && (seq == reldat_packet.getAck())) {
+                                state = CONNECTION_STATE.ESTABLISHED;
+                                break;
+                            }
+                        }
+                        break;
+                    }catch (SocketTimeoutException e){
+                        System.out.println("Timeout. Try to resend SYNACK...");
+                        if(retry > 3) {
+                            throw new IOException("Client is unreachable");
+                        }
+                        retry++;
+                    }
+                }
+            }
+        }
+    }
 
     /**
      * Constructor
@@ -87,6 +142,7 @@ public class RELDAT_Socket {
      */
     public RELDAT_Socket(int localPort)throws SocketException{
         s = new DatagramSocket(localPort);
+        state = CONNECTION_STATE.CLOSED;
     }
 
 

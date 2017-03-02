@@ -4,6 +4,7 @@ import java.io.Serializable;
 public class RELDAT_Packet implements Serializable {
     private int seq;
     private int ack;
+    private int length;
     private TYPE type;
     private int wndwn;
     private byte[] data;
@@ -16,6 +17,15 @@ public class RELDAT_Packet implements Serializable {
         this.type = type;
         this.wndwn = wndwn;
         this.data = data;
+        this.length = data.length;
+    }
+
+    public int getLength() {
+        return length;
+    }
+
+    public void setLength(int length) {
+        this.length = length;
     }
 
     public int getSeq() {
