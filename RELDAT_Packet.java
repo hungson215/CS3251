@@ -10,14 +10,14 @@ public class RELDAT_Packet implements Serializable {
     private byte[] data;
 
     //Packet type
-    public enum TYPE {DATA,SYN,SYNACK,ACK}
-    public RELDAT_Packet(byte[] data, int seq, int ack, TYPE type, int wndwn) {
+    public enum TYPE {DATA,SYN,SYNACK,ACK,PUSH}
+    public RELDAT_Packet(byte[] data, int length, int seq, int ack, TYPE type, int wndwn) {
         this.seq = seq;
         this.ack = ack;
         this.type = type;
         this.wndwn = wndwn;
         this.data = data;
-        this.length = data.length;
+        this.length = length;
     }
 
     public int getLength() {

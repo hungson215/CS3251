@@ -10,11 +10,15 @@ public class RELDAT_Server {
         } else {
             int port = Integer.parseInt(args[0]);
             int recvWndwn = Integer.parseInt(args[1]);
-            s = new RELDAT_Socket(port);
+            s = new RELDAT_Socket(port,1);
             s.setRecvWndwn(recvWndwn);
         }
         System.out.println("Server started: " + Inet4Address.getLocalHost() + ":" + s.getPort());
-        s.accept();
-        System.out.println("Connection established");
+        while(true) {
+            s.accept();
+            System.out.println("Connection established");
+            s.receive();
+            System.out.println("Transfer completed. Waiting for more data");
+        }
     }
 }
