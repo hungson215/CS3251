@@ -14,7 +14,7 @@ public class RELDAT_Packet implements Serializable {
     private int checksum;
 
     //Packet type
-    public enum TYPE {DATA,SYN,SYNACK,ACK,PUSH}
+    public enum TYPE {DATA,SYN,SYNACK,ACK,PUSH,FIN}
     public RELDAT_Packet(byte[] data, int length, int seq, int ack, TYPE type, int wndwn) {
         this.seq = seq;
         this.ack = ack;
@@ -22,6 +22,7 @@ public class RELDAT_Packet implements Serializable {
         this.wndwn = wndwn;
         this.data = data;
         this.length = length;
+
     }
 
     public int getLength() {

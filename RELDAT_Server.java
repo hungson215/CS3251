@@ -18,7 +18,7 @@ public class RELDAT_Server {
             s.accept();
             System.out.println("Connection established");
             s.receive();
-            System.out.println("Transfer completed. Waiting for more data");
+            System.out.println("Transfer completed. Waiting for more data...");
         }
     }
 }
