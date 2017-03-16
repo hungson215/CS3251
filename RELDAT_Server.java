@@ -17,8 +17,12 @@ public class RELDAT_Server {
         while(true) {
             s.accept();
             System.out.println("Connection established");
-            s.receive();
-            System.out.println("Transfer completed. Waiting for more data...");
+            String res = s.receive();
+            System.out.println("Transfer completed.");
+            if(res != null) {
+                s.send(res.toUpperCase());
+            }
+            System.out.println("Waiting for data...");
         }
     }
 }

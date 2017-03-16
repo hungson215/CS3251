@@ -17,9 +17,16 @@ public class RELDAT_Client {
 
             Scanner scan = new Scanner(System.in);
             System.out.print("Please enter your command:");
-            String[] inputs = scan.nextLine().split(" ");
-            if(inputs[0].compareTo("transform")==0) {
-                s.send(inputs[1]);
+            String inputs = scan.nextLine();
+            if(inputs.toLowerCase().startsWith("transform")) {
+                String[] filename = inputs.split(" ");
+                s.send(filename[1]);
+            } else {
+                s.send(inputs);
+                String res = s.receive();
+                if(res !=null) {
+                    System.out.println("Respond: " + res);
+                }
             }
         }
     }
