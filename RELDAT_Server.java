@@ -1,5 +1,6 @@
 import java.io.IOException;
 import java.net.Inet4Address;
+import java.net.SocketException;
 
 public class RELDAT_Server {
     public static void main(String[] args) throws NumberFormatException, IOException,ClassNotFoundException{
@@ -13,16 +14,21 @@ public class RELDAT_Server {
             s = new RELDAT_Socket(port,1);
             s.setRecvWndwn(recvWndwn);
         }
-        System.out.println("Server started: " + Inet4Address.getLocalHost() + ":" + s.getPort());
         while(true) {
+            System.out.println("Server started: " + Inet4Address.getLocalHost() + ":" + s.getPort());
+            System.out.println("Waiting for connection request");
             s.accept();
-            System.out.println("Connection established");
-            String res = s.receive();
-            System.out.println("Transfer completed.");
-            if(res != null) {
-                s.send(res.toUpperCase());
+            System.out.println("Connection established!");
+            while(true) {
+                try {
+                    String res = s.receive();
+                    if (res != null) {
+                        s.send(res.toUpperCase());
+                    }
+                }catch (SocketException e) {
+                    break;
+                }
             }
-            System.out.println("Waiting for data...");
         }
     }
 }
