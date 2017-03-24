@@ -13,13 +13,8 @@ public class RELDAT_Client {
             int wndwn = Integer.parseInt(args[1]);
             s = new RELDAT_Socket(2000,1);
             s.setRecvWndwn(wndwn);
-<<<<<<< HEAD
-            s.connect("10.0.75.1",4000);
-            System.out.println("Connection established");
-=======
             s.connect("10.0.75.1",4000);
             System.out.println("Connection established!");
->>>>>>> David
 
             Scanner scan = new Scanner(System.in);
             while(true) {
