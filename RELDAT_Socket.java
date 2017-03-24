@@ -70,6 +70,7 @@ public class RELDAT_Socket {
             buffer = new byte[length];
             System.arraycopy(data,0,buffer,0,length);
             RELDAT_Packet reldat_packet = new RELDAT_Packet(buffer,length,seq,ack, RELDAT_Packet.TYPE.DATA,recvWndwn);
+            reldat_packet.setChecksum();
             packets.add(reldat_packet);
             seq+= length;
             //Else, split data into multiple packets
@@ -81,11 +82,13 @@ public class RELDAT_Socket {
                     buffer = new byte[MSS];
                     System.arraycopy(data, i, buffer, 0, MSS);
                     reldat_packet = new RELDAT_Packet(buffer, buffer.length, seq, ack, RELDAT_Packet.TYPE.DATA, recvWndwn);
+                    reldat_packet.setChecksum();
                     seq += MSS;
                 } else{
                     buffer = new byte[length - i];
                     System.arraycopy(data, i, buffer, 0, length - i);
                     reldat_packet = new RELDAT_Packet(buffer, buffer.length, seq, ack, RELDAT_Packet.TYPE.DATA,recvWndwn);
+                    reldat_packet.setChecksum();
                     seq += length - i;
                 }
                 packets.add(reldat_packet);
@@ -93,6 +96,17 @@ public class RELDAT_Socket {
             }
         }
         return packets;
+    }
+
+    /**
+     * checking to see if packet is not corrupt
+     * @param packetV
+     * @return if packet is corrupt or not
+     * @throws IOException
+     */
+    private boolean validatePacket(RELDAT_Packet packetV) throws IOException {
+        int checksumVal = packetV.calculateChecksum();
+        return checksumVal == packetV.getChecksum();
     }
 
     /**
@@ -108,7 +122,7 @@ public class RELDAT_Socket {
         s.receive(p); // Wait for connection request
         RELDAT_Packet reldat_packet = Unpack(p);
         //If SYN request received
-        if (reldat_packet.getType() == RELDAT_Packet.TYPE.SYN) {
+        if (reldat_packet.getType() == RELDAT_Packet.TYPE.SYN && validatePacket(reldat_packet)) {
             if(debug == 1) {
                 System.out.println("SYN Request Received from " + p.getAddress().toString());
             }
@@ -118,6 +132,7 @@ public class RELDAT_Socket {
             remotePort = p.getPort();
 
             reldat_packet = new RELDAT_Packet(new byte[1],1, seq, ack, RELDAT_Packet.TYPE.SYNACK, recvWndwn);
+            reldat_packet.setChecksum();
             if(debug == 1) {
                 System.out.println("Send SYNACK to " + remoteAddr.toString());
             }
@@ -135,7 +150,7 @@ public class RELDAT_Socket {
                         s.receive(p);
                         reldat_packet = Unpack(p);
                         //If ACK of SYNACK received
-                        if ((reldat_packet.getType() == RELDAT_Packet.TYPE.ACK) && (seq == reldat_packet.getAck())) {
+                        if ((reldat_packet.getType() == RELDAT_Packet.TYPE.ACK) && validatePacket(reldat_packet) && (seq == reldat_packet.getAck())) {
                             if(debug ==1) {
                                 System.out.println("ACK of SYNACK Received. Connection is established!");
                             }
@@ -143,7 +158,7 @@ public class RELDAT_Socket {
                             ack += reldat_packet.getLength();
                             break;
                             //If the ACK of SYNACK is lost.
-                        } else if(reldat_packet.getType() == RELDAT_Packet.TYPE.DATA){
+                        } else if(reldat_packet.getType() == RELDAT_Packet.TYPE.DATA && validatePacket(reldat_packet)){
                             //Assume that the connection is established
                             if(debug == 1) {
                                 System.out.println("Expect ACK of SYNACK but received DATA");
@@ -187,6 +202,7 @@ public class RELDAT_Socket {
         this.remoteAddr = InetAddress.getByName(serverAddr);
         this.remotePort = serverPort;
         RELDAT_Packet reldat_packet = new RELDAT_Packet(buffer,1, seq,ack, RELDAT_Packet.TYPE.SYN,recvWndwn);
+        reldat_packet.setChecksum();
         seq+=1;
         DatagramPacket p = Pack(reldat_packet);
         s.setSoTimeout(3000);
@@ -201,7 +217,7 @@ public class RELDAT_Socket {
                 p = new DatagramPacket(buffer,buffer.length);
                 s.receive(p);
                 reldat_packet = Unpack(p);
-                if(reldat_packet.getType() == RELDAT_Packet.TYPE.SYNACK) {
+                if(reldat_packet.getType() == RELDAT_Packet.TYPE.SYNACK && validatePacket(reldat_packet)) {
                     if(debug == 1) {
                         System.out.println("SYNACK received!");
                     }
@@ -211,6 +227,7 @@ public class RELDAT_Socket {
                     remotePort = p.getPort();
                 }
                 reldat_packet = new RELDAT_Packet(new byte[1],1, seq, ack, RELDAT_Packet.TYPE.ACK, recvWndwn);
+                reldat_packet.setChecksum();
                 seq+=1;
                 p = Pack(reldat_packet);
                 if(debug == 1) {
@@ -312,7 +329,7 @@ public class RELDAT_Socket {
                         System.out.println("Received ACK. Next expected packet# " + reldat_recvpacket.getAck());
                     }
                     //Check if the received packet is ACK
-                    if (reldat_recvpacket.getType() == RELDAT_Packet.TYPE.ACK) {
+                    if (reldat_recvpacket.getType() == RELDAT_Packet.TYPE.ACK && validatePacket(reldat_recvpacket)) {
                         //Check if the received packet is expected. Then move the window forward
                         if ((ack == reldat_recvpacket.getSeq()) &&
                                 (reldat_recvpacket.getAck() == (packets.get(0).getSeq() + packets.get(0).getLength()))) {
@@ -336,13 +353,14 @@ public class RELDAT_Socket {
                             }
                             //Update the ack number
                             ack = reldat_recvpacket.getSeq() + reldat_recvpacket.getLength();
-                            //Need to send multiple packets
+                            //Need to send multiple packets until window is full
                             while (true) {
                                 //Remove the first packet
                                 packets.remove(0);
                                 //Check if there is any packet left
                                 if (index < packets.size()) {
                                     RELDAT_Packet reldat_packet = packets.get(0);
+                                    // send packets till window full
                                     if (reldat_packet.getSeq() <= reldat_recvpacket.getAck()) {
                                         if(debug == 1) {
                                             System.out.println("Send packet#" + packets.get(index).getSeq());
@@ -411,7 +429,7 @@ public class RELDAT_Socket {
             DatagramPacket p = new DatagramPacket(buffer, buffer.length);
             s.receive(p);
             RELDAT_Packet reldat_packet = Unpack(p);
-            if(reldat_packet.getSeq() == ack) {
+            if(reldat_packet.getSeq() == ack && validatePacket(reldat_packet)) {
                 if ((reldat_packet.getType() == RELDAT_Packet.TYPE.DATA) ||
                         (reldat_packet.getType() == RELDAT_Packet.TYPE.PUSH)) {
                     if (debug == 1) {
@@ -426,6 +444,7 @@ public class RELDAT_Socket {
                     ack += reldat_packet.getLength();
                     buffer = new byte[1];
                     RELDAT_Packet reldat_ackpacket = new RELDAT_Packet(buffer, buffer.length, seq, ack, RELDAT_Packet.TYPE.ACK, senderWndwn);
+                    reldat_ackpacket.setChecksum();
                     seq += buffer.length;
                     p = Pack(reldat_ackpacket);
 
@@ -475,10 +494,12 @@ public class RELDAT_Socket {
                         ack += reldat_packet.getLength();
                         buffer = new byte[1];
                         RELDAT_Packet reldat_ackpacket = new RELDAT_Packet(buffer, buffer.length, seq, ack, RELDAT_Packet.TYPE.ACK, senderWndwn);
+                        reldat_ackpacket.setChecksum();
                         seq += buffer.length;
                         //Prepare FIN
                         buffer = new byte[1];
                         RELDAT_Packet reldat_finpacket = new RELDAT_Packet(buffer,buffer.length,seq,ack, RELDAT_Packet.TYPE.FIN,senderWndwn);
+                        reldat_finpacket.setChecksum();
                         seq += buffer.length;
 
                         DatagramPacket ackpacket = Pack(reldat_ackpacket);
@@ -499,7 +520,7 @@ public class RELDAT_Socket {
                                 s.receive(p);
                                 RELDAT_Packet res = Unpack(p);
                                 if ((res.getType() == RELDAT_Packet.TYPE.ACK) &&
-                                        (res.getAck() == seq)) {
+                                        (res.getAck() == seq) && validatePacket(res)) {
                                     if(debug == 1) {
                                         System.out.println("ACK Received!");
                                         System.out.println("Connection State: CLOSE_WAIT -> CLOSED");
@@ -530,6 +551,7 @@ public class RELDAT_Socket {
                 //Send ACK for the last in-order packet
                 buffer = new byte[1];
                 RELDAT_Packet reldat_ackpacket = new RELDAT_Packet(buffer, buffer.length, seq, ack, RELDAT_Packet.TYPE.ACK, senderWndwn);
+                reldat_ackpacket.setChecksum();
                 seq += buffer.length;
                 p = Pack(reldat_ackpacket);
                 s.send(p);
@@ -541,6 +563,7 @@ public class RELDAT_Socket {
         //Prepare FIN packet
         byte[] buffer = new byte[1];
         RELDAT_Packet reldat_packet = new RELDAT_Packet(buffer,buffer.length,seq,ack, RELDAT_Packet.TYPE.FIN,recvWndwn);
+        reldat_packet.setChecksum();
         seq+=buffer.length;
         DatagramPacket p = Pack(reldat_packet);
         s.setSoTimeout(2000);
@@ -564,7 +587,7 @@ public class RELDAT_Socket {
                         DatagramPacket res = new DatagramPacket(buffer, buffer.length);
                         s.receive(res);
                         RELDAT_Packet reldat_res = Unpack(res);
-                        if (reldat_res.getAck() == seq) {
+                        if (reldat_res.getAck() == seq && validatePacket(reldat_res)) {
                             //If ACK is received
                             ack += reldat_res.getLength();
                             if (reldat_res.getType() == RELDAT_Packet.TYPE.ACK) {
@@ -591,6 +614,7 @@ public class RELDAT_Socket {
                                 //Send ack for this fin
                                 buffer = new byte[1];
                                 reldat_packet = new RELDAT_Packet(buffer, buffer.length, seq, ack, RELDAT_Packet.TYPE.ACK, recvWndwn);
+                                reldat_packet.setChecksum();
                                 seq += buffer.length;
                                 p = Pack(reldat_packet);
                                 s.send(p);
