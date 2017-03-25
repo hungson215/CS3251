@@ -11,7 +11,7 @@ public class RELDAT_Packet implements Serializable {
     private TYPE type;
     private int wndwn;
     private byte[] data;
-    private int checksum;
+    private long checksum;
 
     //Packet type
     public enum TYPE {DATA,SYN,SYNACK,ACK,PUSH,FIN}
@@ -73,7 +73,7 @@ public class RELDAT_Packet implements Serializable {
         this.data = data;
     }
 
-    public int getChecksum() { return checksum;}
+    public long getChecksum() { return checksum;}
 
     private byte[] getPacketByteArray() throws IOException {
         byte[] packetByteArray;
@@ -94,10 +94,10 @@ public class RELDAT_Packet implements Serializable {
 
     }
 
-    public int calculateChecksum() throws IOException {
+    public long calculateChecksum() throws IOException {
         CRC32 checksum = new CRC32();
         checksum.update(getPacketByteArray());
-        return (int) checksum.getValue();
+        return checksum.getValue();
     }
 
     public void setChecksum() throws IOException {
