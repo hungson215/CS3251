@@ -105,7 +105,7 @@ public class RELDAT_Socket {
      * @throws IOException
      */
     private boolean validatePacket(RELDAT_Packet packetV) throws IOException {
-        int checksumVal = packetV.calculateChecksum();
+        long checksumVal = packetV.calculateChecksum();
         return checksumVal == packetV.getChecksum();
     }
 
@@ -296,6 +296,7 @@ public class RELDAT_Socket {
 
         //set the last packet's type as PUSH
         packets.get(packets.size()-1).setType(RELDAT_Packet.TYPE.PUSH);
+        packets.get(packets.size()-1).setChecksum();
         if(debug == 1) {
             System.out.println("Total packets need to send: " + packets.size());
             System.out.println("Start sending data...");
