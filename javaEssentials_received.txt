@@ -1,0 +1,49 @@
+java application program
+	- a java program is class which always has a main method to run the application.
+
+1.2 
+	constants are specific values that can not be chagned unlike variables.
+	if combinding two varriables with any operand that is of value double the result will be a double.
+	
+
+chapter 1.1
+	Self test exercises. page 8 in the book
+		1) Java is not a drink.
+		2) System.out.println("I like Java")
+			System.out.println("You like tea.")
+		3)
+		public class hello {
+				public static void main(String[] args) {
+					System.out.println("Hello World!")
+				}
+		}
+
+		4) a compiler is a program that translates high level language code to low level code which are called 
+			machine code so that the computer may understand.
+		5) source program is the high level language program that has not been translated from a compiler.
+		6) Object program is the low level language program that has been translated from source code.
+		7) you call it the interperter
+		8)NiceClass.java
+		9) NiceClass.class
+	1.2 questions
+		10) rate1, TimeLimit, numberOfWindows.
+		11) yes
+		12) int feet = 0 
+			int inches = 0
+		13) int count = 0;
+			double distance = 1.5;
+		14) distance = time * 80;
+		15) double interest = balance * rate;
+		16) b, c, c
+		17) int a = 3*x; , b = (x+ y) / 7; , c = (3*x + y)/ (z + 2)
+		18)  0
+		19) quotient = 2, remainder = 1;
+		20) result is 5
+		21) a. 52.0
+			b. what is happening is that 9 / 5 gives the value of 1 because there are two integers. 
+				the programer wanted the value of 9/5 to be a decimal of 1.8.
+			c. fahrenheit = (9 / 5.0) * celsius + 32.0;
+		
+
+		
+		

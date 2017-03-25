@@ -23,6 +23,7 @@ public class RELDAT_Server {
                 try {
                     String res = s.receive();
                     if (res != null) {
+                        System.out.println("Client's message: " + res);
                         s.send(res.toUpperCase());
                     }
                 }catch (SocketException e) {

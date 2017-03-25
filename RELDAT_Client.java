@@ -4,7 +4,7 @@ import java.net.SocketException;
 import java.util.Scanner;
 
 public class RELDAT_Client {
-    public static void main(String[] args) throws SocketException,ClassNotFoundException,IOException{
+    public static void main(String[] args) throws ClassNotFoundException,IOException{
         RELDAT_Socket s;
         if(args.length == 0) {
             System.out.println("Usage: reldat_client [hostIP]:[Port] [window]");
@@ -13,7 +13,8 @@ public class RELDAT_Client {
             int wndwn = Integer.parseInt(args[1]);
             s = new RELDAT_Socket(2000,1);
             s.setRecvWndwn(wndwn);
-            s.connect(InetAddress.getLocalHost().getHostName(),4000);
+            int port = Integer.parseInt(tokens[1]);
+            s.connect(tokens[0],port);
             System.out.println("Connection established!");
 
             Scanner scan = new Scanner(System.in);
