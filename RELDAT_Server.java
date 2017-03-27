@@ -1,3 +1,5 @@
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.Inet4Address;
 import java.net.SocketException;
@@ -14,6 +16,7 @@ public class RELDAT_Server {
             s = new RELDAT_Socket(port,1);
             s.setRecvWndwn(recvWndwn);
         }
+        int bytecount;
         while(true) {
             System.out.println("Server started: " + Inet4Address.getLocalHost() + ":" + s.getPort());
             System.out.println("Waiting for connection request");
@@ -22,10 +25,20 @@ public class RELDAT_Server {
             while(true) {
                 try {
                     String res = s.receive();
+                    FileInputStream recievedText = new FileInputStream(res);
+                    byte[] byteText = new byte[1000];
+                    String sending = "";
+                    while ((bytecount = recievedText.read(byteText, 0, 1000)) != -1) {
+                        sending += new String(byteText).toUpperCase();
+                    }
+                    FileOutputStream sendFile = new FileOutputStream(res);
+                    sendFile.write(sending.getBytes());
+                    s.send(res);
+                    /*
                     if (res != null) {
                         System.out.println("Client's message: " + res);
                         s.send(res.toUpperCase());
-                    }
+                    } */
                 }catch (SocketException e) {
                     break;
                 }

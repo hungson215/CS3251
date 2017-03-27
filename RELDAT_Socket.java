@@ -207,7 +207,7 @@ public class RELDAT_Socket {
                         p = new DatagramPacket(buffer, buffer.length);
                         s.receive(p);
                         RELDAT_Packet res = Unpack(p);
-                        if (res.getType() == RELDAT_Packet.TYPE.SYNACK && validatePacket(reldat_packet)) {
+                        if (res.getType() == RELDAT_Packet.TYPE.SYNACK && validatePacket(res)) {
                             if (debug == 1) {
                                 System.out.println("SYNACK received!");
                             }
@@ -490,8 +490,6 @@ public class RELDAT_Socket {
                                         System.out.println("File transfer request is received.");
                                     }
                                 //Else, return the received message
-                                } else {
-                                    return msg;
                                 }
                                 continue;
                             //If the file is already opened for writing, close it
@@ -537,7 +535,7 @@ public class RELDAT_Socket {
                 break;
             }
         }
-        return null;
+        return filename;
     }
 
     public void disconnect() throws IOException, ClassNotFoundException{

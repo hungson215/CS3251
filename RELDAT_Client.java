@@ -24,15 +24,12 @@ public class RELDAT_Client {
                 if (inputs.toLowerCase().startsWith("transform")) {
                     String[] filename = inputs.split(" ");
                     s.send(filename[1]);
+                    s.receive();
                 } else if(inputs.toLowerCase().startsWith("disconnect")) {
                     s.disconnect();
                     break;
                 } else {
-                    s.send(inputs);
-                    String res = s.receive();
-                    if (res != null) {
-                        System.out.println("Server's response: " + res);
-                    }
+                    System.out.println("Wrong inputs the commands are transform and disconnect.");
                 }
             }
         }
