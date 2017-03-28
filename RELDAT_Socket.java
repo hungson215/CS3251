@@ -570,8 +570,9 @@ public class RELDAT_Socket {
 
             //Send FIN
             buffer = new byte[1];
-            s.send(Pack(new RELDAT_Packet(buffer,buffer.length,seq,ack, RELDAT_Packet.TYPE.FIN,recvWndwn)));
-            reldat_packet.setChecksum();
+            RELDAT_Packet finPacket2 =  new RELDAT_Packet(buffer,buffer.length,seq,ack, RELDAT_Packet.TYPE.FIN,recvWndwn);
+            finPacket2.setChecksum();
+            s.send(Pack(finPacket2));
             state = CONNECTION_STATE.LAST_ACK;
             if(debug == 1) {
                 System.out.println("Send FIN packet!");

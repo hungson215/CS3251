@@ -11,9 +11,17 @@ public class RELDAT_Client {
         } else{
             String Ipaddress = args[0];
             int wndwn = Integer.parseInt(args[2]);
+            if (wndwn <= 0) {
+                System.out.println("window can't be lower than 1");
+                System.exit(0);
+            }
             s = new RELDAT_Socket(2000,1);
             s.setRecvWndwn(wndwn);
             int port = Integer.parseInt(args[1]);
+            if (port <= 1024 && (port >= 65535)) {
+                System.out.println("Port number must be between 1024 and 65535");
+                System.exit(0);
+            }
             s.connect(Ipaddress,port);
             if (s.getState() == RELDAT_Socket.CONNECTION_STATE.CLOSED) {
                 System.out.println("Connection could not be established closing the client");

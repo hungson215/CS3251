@@ -7,12 +7,20 @@ import java.net.SocketException;
 public class RELDAT_Server {
     public static void main(String[] args) throws NumberFormatException, IOException,ClassNotFoundException{
         RELDAT_Socket s;
-        if(args.length == 0){
+        if(args.length != 2){
             System.out.println("Usage: reldat_server [port] [recvWindow]");
             return;
         } else {
             int port = Integer.parseInt(args[0]);
+            if (port <= 1024 && (port >= 65535)) {
+                System.out.println("Port number must be between 1024 and 65535");
+                System.exit(0);
+            }
             int recvWndwn = Integer.parseInt(args[1]);
+            if (recvWndwn <= 0) {
+                System.out.println("window can't be lower than 1");
+                System.exit(0);
+            }
             s = new RELDAT_Socket(port,1);
             s.setRecvWndwn(recvWndwn);
         }
