@@ -31,8 +31,10 @@ public class RELDAT_Server {
                     while ((bytecount = recievedText.read(byteText, 0, 1000)) != -1) {
                         sending += new String(byteText).toUpperCase();
                     }
+                    recievedText.close();
                     FileOutputStream sendFile = new FileOutputStream(res);
                     sendFile.write(sending.getBytes());
+                    sendFile.close();
                     s.send(res);
                     /*
                     if (res != null) {

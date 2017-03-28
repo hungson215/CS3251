@@ -643,6 +643,11 @@ public class RELDAT_Socket {
         }
 
     }
+
+    public CONNECTION_STATE getState() {
+        return state;
+    }
+
     /**
      * Constructor
      * @param localPort

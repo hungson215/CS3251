@@ -6,15 +6,19 @@ import java.util.Scanner;
 public class RELDAT_Client {
     public static void main(String[] args) throws ClassNotFoundException,IOException{
         RELDAT_Socket s;
-        if(args.length == 0) {
-            System.out.println("Usage: reldat_client [hostIP]:[Port] [window]");
+        if(args.length != 3) {
+            System.out.println("Usage: reldat_client [hostIP] [Port] [window]");
         } else{
-            String[] tokens = args[0].split(":");
-            int wndwn = Integer.parseInt(args[1]);
+            String Ipaddress = args[0];
+            int wndwn = Integer.parseInt(args[2]);
             s = new RELDAT_Socket(2000,1);
             s.setRecvWndwn(wndwn);
-            int port = Integer.parseInt(tokens[1]);
-            s.connect(tokens[0],port);
+            int port = Integer.parseInt(args[1]);
+            s.connect(Ipaddress,port);
+            if (s.getState() == RELDAT_Socket.CONNECTION_STATE.CLOSED) {
+                System.out.println("Connection could not be established closing the client");
+                System.exit(0);
+            }
             System.out.println("Connection established!");
 
             Scanner scan = new Scanner(System.in);
