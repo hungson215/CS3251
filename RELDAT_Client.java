@@ -13,7 +13,7 @@ public class RELDAT_Client {
             s = new RELDAT_Socket(2000,1);
             s.setRecvWndwn(wndwn);
             int port = Integer.parseInt(tokens[1]);
-            s.connect(tokens[0],port);
+            /*s.connect(tokens[0],port);
             System.out.println("Connection established!");
 
             Scanner scan = new Scanner(System.in);
@@ -33,6 +33,12 @@ public class RELDAT_Client {
                         System.out.println("Server's response: " + res);
                     }
                 }
+            }*/
+            for(int i = 0; i < 10; i++) {
+                System.out.println("----- TEST: " + i + " -----");
+                s.connect(tokens[0],port);
+                System.out.println("Disconnecting");
+                s.disconnect();
             }
         }
     }

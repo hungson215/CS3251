@@ -1,9 +1,6 @@
-import javax.xml.crypto.Data;
 import java.io.*;
 import java.net.*;
 import java.util.ArrayList;
-import java.util.Timer;
-import java.util.TimerTask;
 
 
 public class RELDAT_Socket {
@@ -16,9 +13,9 @@ public class RELDAT_Socket {
     private InetAddress remoteAddr;
     private int remotePort;
     private CONNECTION_STATE state;
-    public enum CONNECTION_STATE {LISTEN, ESTABLISHED, CLOSED, FIN_WAIT_1,FIN_WAIT_2, CLOSING, CLOSE_WAIT,LAST_ACK,TIME_WAIT}
-    private byte[] receivedBuffer; //Receiver's Buffer
+    public enum CONNECTION_STATE {LISTEN, ESTABLISHED, CLOSED, FIN_WAIT_1,FIN_WAIT_2, CLOSE_WAIT,LAST_ACK,TIME_WAIT,OPENED}
     private int debug;
+    private static RELDAT_Packet res_packet;
 
     public int getPort() {
         return s.getLocalPort();
@@ -27,7 +24,6 @@ public class RELDAT_Socket {
     public void setRecvWndwn(int recvWndwn)
     {
         this.recvWndwn = recvWndwn;
-        receivedBuffer = new byte[recvWndwn];
     }
 
     /**
@@ -101,65 +97,59 @@ public class RELDAT_Socket {
     public void accept() throws IOException, ClassNotFoundException {
         s.setSoTimeout(0);
         state = CONNECTION_STATE.LISTEN;
-        byte[] buffer = new byte[MSS];
-        DatagramPacket p = new DatagramPacket(buffer,buffer.length);
-        s.receive(p); // Wait for connection request
-        RELDAT_Packet reldat_packet = Unpack(p);
-        //If SYN request received
-        if (reldat_packet.getType() == RELDAT_Packet.TYPE.SYN) {
-            if(debug == 1) {
-                System.out.println("SYN Request Received from " + p.getAddress().toString());
-            }
-            ack = reldat_packet.getSeq() + reldat_packet.getLength();
-            senderWndwn = reldat_packet.getWndwn();
-            remoteAddr = p.getAddress();
-            remotePort = p.getPort();
 
-            reldat_packet = new RELDAT_Packet(new byte[1],1, seq, ack, RELDAT_Packet.TYPE.SYNACK, recvWndwn);
-            if(debug == 1) {
-                System.out.println("Send SYNACK to " + remoteAddr.toString());
-            }
-            seq += 1;
-            s.setSoTimeout(5000); // Set timout for 5s
-            int retry = 0;
-            //Wait and resend SYNACK when needed
-            while(true) {
-                try {
-                    s.send(Pack(reldat_packet));
-                    buffer = new byte[MSS];
-                    p = new DatagramPacket(buffer, buffer.length);
-                    while(true) {
-                        s.receive(p);
-                        RELDAT_Packet res = Unpack(p);
-                        //If ACK of SYNACK received
-                        if ((res.getType() == RELDAT_Packet.TYPE.ACK) && (ack == res.getSeq())) {
-                            if(debug ==1) {
-                                System.out.println("ACK of SYNACK Received. Connection is established!");
-                            }
-                            state = CONNECTION_STATE.ESTABLISHED;
-                            ack += res.getLength();
-                            break;
-                        }
+        while(state == CONNECTION_STATE.LISTEN) {
+            byte[] buffer = new byte[MSS];
+            DatagramPacket p = new DatagramPacket(buffer,buffer.length);
+            s.receive(p); // Wait for connection request
+            res_packet = Unpack(p);
+
+            //If SYN request received
+            if (res_packet.getType() == RELDAT_Packet.TYPE.SYN) {
+                if (debug == 1) {
+                    if(remoteAddr != p.getAddress()){
+                        System.out.println("SYN Request Received from " + p.getAddress().toString());
+                    } else {
+                        System.out.println("SYNACK is lost. Resend SYNACK!");
                     }
-                    break;
-                }catch (SocketTimeoutException e){
-                    System.out.println("Timeout. Try to resend SYNACK...");
-                    if(retry > 5) {
-                        throw new IOException("Client is unreachable.");
-                    }
-                    retry++;
                 }
+                ack = res_packet.getSeq() + res_packet.getLength();
+                senderWndwn = res_packet.getWndwn();
+                remoteAddr = p.getAddress();
+                remotePort = p.getPort();
+
+                //Send SYNACK
+                if (debug == 1) {
+                    System.out.println("Send SYNACK to " + remoteAddr.toString());
+                }
+                s.send(Pack(new RELDAT_Packet(new byte[1], 1, seq, ack, RELDAT_Packet.TYPE.SYNACK, recvWndwn)));
+                seq += 1;
+
+                //If ACK of SYNACK Received
+            } else if((res_packet.getType() == RELDAT_Packet.TYPE.ACK) && (ack == res_packet.getSeq())){
+                if(debug ==1) {
+                    System.out.println("ACK of SYNACK is received!");
+                }
+                state = CONNECTION_STATE.ESTABLISHED;
+                ack += res_packet.getLength();
+                res_packet = null;
+                //If ACK of SYNACK is lost
+            } else if(res_packet.getType() != RELDAT_Packet.TYPE.SYN){ //DATA,PUSH,FIN
+                ack = res_packet.getSeq();
+                state = CONNECTION_STATE.ESTABLISHED;
             }
         }
-        System.out.println("---SERVER STATUS---");
-        System.out.println("localPort:" + s.getLocalPort());
-        System.out.println("localAddress" + Inet4Address.getLocalHost());
-        System.out.println("Seq:" + seq);
-        System.out.println("Ack:" + ack);
-        System.out.println("RecvWindown:" + recvWndwn);
-        System.out.println("SenderWindow:" + senderWndwn);
-        System.out.println("remoteAddress:" + remoteAddr.toString());
-        System.out.println("remotePort:" + remotePort);
+        System.out.println("---CONNECTION STATUS---");
+        System.out.println("State          : " + state);
+        System.out.println("LocalPort      : " + s.getLocalPort());
+        System.out.println("LocalAddress   : " + Inet4Address.getLocalHost());
+        System.out.println("Seq            : " + seq);
+        System.out.println("Ack            : " + ack);
+        System.out.println("RecvWindow     : " + recvWndwn);
+        System.out.println("SenderWindow   : " + senderWndwn);
+        System.out.println("Remote Address : " + remoteAddr.toString());
+        System.out.println("Remote Port    : " + remotePort);
+        System.out.println("-------------------------");
     }
 
     /**
@@ -170,77 +160,75 @@ public class RELDAT_Socket {
      * @throws ClassNotFoundException
      */
     public void connect(String serverAddr, int serverPort) throws IOException,ClassNotFoundException {
+        state = CONNECTION_STATE.OPENED;
         byte[] buffer = new byte[1];
         this.remoteAddr = InetAddress.getByName(serverAddr);
         this.remotePort = serverPort;
-        RELDAT_Packet reldat_packet = new RELDAT_Packet(buffer,1, seq,ack, RELDAT_Packet.TYPE.SYN,recvWndwn);
-        seq+=1;
-        s.setSoTimeout(3000);
-        DatagramPacket p;
+        s.setSoTimeout(500);
         int retry = 0;
-        while (true) {
+
+        //Send SYN packet
+        RELDAT_Packet reldat_syn_packet = new RELDAT_Packet(buffer,1, seq,ack, RELDAT_Packet.TYPE.SYN,recvWndwn);
+        seq+=buffer.length;
+        if(debug == 1) {
+            System.out.println("Send out SYN request to " + serverAddr);
+        }
+        s.send(Pack(reldat_syn_packet));
+
+        while (state == CONNECTION_STATE.OPENED) {
             try {
-                if(debug == 1) {
-                    System.out.println("Send out SYN request to " + serverAddr);
-                }
-                s.send(Pack(reldat_packet));
                 //Wait for SYNACK and send ACK
-                while(true) {
-                    try {
-                        buffer = new byte[MSS];
-                        p = new DatagramPacket(buffer, buffer.length);
-                        s.receive(p);
-                        RELDAT_Packet res = Unpack(p);
-                        if (res.getType() == RELDAT_Packet.TYPE.SYNACK) {
-                            if (debug == 1) {
-                                System.out.println("SYNACK received!");
-                            }
-                            ack = res.getSeq() + res.getLength();
-                            senderWndwn = res.getWndwn();
-                            remoteAddr = p.getAddress();
-                            remotePort = p.getPort();
-                        } else {
-                            if(debug == 1) {
-                                System.out.println("Expect SYNACK. Received " + res.getType());
-                                System.out.println("Resend SYN");
-                            }
-                            break;
-                        }
-                        reldat_packet = new RELDAT_Packet(new byte[1], 1, seq, ack, RELDAT_Packet.TYPE.ACK, recvWndwn);
-                        seq += 1;
-                        if (debug == 1) {
-                            System.out.println("Send ACK of SYNACK");
-                        }
-                        s.send(Pack(reldat_packet));
-                        state = CONNECTION_STATE.ESTABLISHED;
-                    } catch (SocketTimeoutException e) {
-                        if(state == CONNECTION_STATE.ESTABLISHED) {
-                            return;
-                        } else {
-                            throw new SocketTimeoutException(e.getMessage());
-                        }
+                buffer = new byte[MSS];
+                DatagramPacket p = new DatagramPacket(buffer, buffer.length);
+                s.receive(p);
+                res_packet = Unpack(p);
+
+                //If the packet received is SYNACK
+                if (res_packet.getType() == RELDAT_Packet.TYPE.SYNACK) {
+                    if (debug == 1) {
+                        System.out.println("SYNACK received!");
+                    }
+                    ack = res_packet.getSeq() + res_packet.getLength();
+                    senderWndwn = res_packet.getWndwn();
+                    remoteAddr = p.getAddress();
+                    remotePort = p.getPort();
+                    if (debug == 1) {
+                        System.out.println("Send ACK of SYNACK packet!");
+                    }
+                    s.send(Pack(new RELDAT_Packet(new byte[1], 1, seq, ack, RELDAT_Packet.TYPE.ACK, recvWndwn)));
+                    seq += 1;
+                    state = CONNECTION_STATE.ESTABLISHED;
+                //Else, resend SYN request
+                } else {
+                    if(debug == 1) {
+                        System.out.println("Expect SYNACK. Received " + res_packet.getType());
+                        System.out.println("Resend SYN !");
+                        s.send(Pack(reldat_syn_packet));
                     }
                 }
             }catch (SocketTimeoutException e){
                 if(retry < 3) {
                     System.out.println("Timeout! Try to resend SYN...");
+                    s.send(Pack(reldat_syn_packet));
                     retry++;
                 } else {
                     System.out.println("Closing the connection");
                     state = CONNECTION_STATE.CLOSED;
-                    break;
+                    throw new IOException("Can't connect to the server");
                 }
             }
         }
         System.out.println("---CLIENT STATUS---");
-        System.out.println("localPort:" + s.getLocalPort());
-        System.out.println("localAddress" + Inet4Address.getLocalHost());
-        System.out.println("Seq:" + seq);
-        System.out.println("Ack:" + ack);
-        System.out.println("RecvWindown:" + recvWndwn);
-        System.out.println("SenderWindow:" + senderWndwn);
-        System.out.println("remoteAddress:" + remoteAddr.toString());
-        System.out.println("remotePort:" + remotePort);
+        System.out.println("State          : " + state);
+        System.out.println("LocalPort      : " + s.getLocalPort());
+        System.out.println("LocalAddress   : " + Inet4Address.getLocalHost());
+        System.out.println("Seq            : " + seq);
+        System.out.println("Ack            : " + ack);
+        System.out.println("RecvWindown    : " + recvWndwn);
+        System.out.println("SenderWindow   : " + senderWndwn);
+        System.out.println("Remote Address : " + remoteAddr.toString());
+        System.out.println("Remote Port    : " + remotePort);
+        res_packet = null;
     }
 
     /**
@@ -250,7 +238,7 @@ public class RELDAT_Socket {
      * @throws ClassNotFoundException
      */
     public void send(String filename) throws IOException,ClassNotFoundException {
-        s.setSoTimeout(2000);
+        s.setSoTimeout(1000);
         FileInputStream fis ;
         byte[] sendData = new byte[MSS];
         int byteCount;
@@ -308,18 +296,18 @@ public class RELDAT_Socket {
                     byte[] buffer = new byte[MSS];
                     DatagramPacket p = new DatagramPacket(buffer, buffer.length);
                     s.receive(p);
-                    //Packet received
-                    RELDAT_Packet reldat_recvpacket = Unpack(p);
+                    res_packet = Unpack(p);
+
                     if (debug == 1) {
-                        System.out.println("Received ACK. Next expected packet# " + reldat_recvpacket.getAck());
+                        System.out.println("Received ACK. Expected sending packet# " + res_packet.getAck());
                     }
                     //Check if the received packet is ACK
-                    if (reldat_recvpacket.getType() == RELDAT_Packet.TYPE.ACK) {
+                    if (res_packet.getType() == RELDAT_Packet.TYPE.ACK) {
                         //Check if the received packet is expected. Then move the window forward
-                        if ((ack == reldat_recvpacket.getSeq()) &&
-                                (reldat_recvpacket.getAck() == (packets.get(0).getSeq() + packets.get(0).getLength()))) {
+                        if ((ack == res_packet.getSeq()) &&
+                                (res_packet.getAck() == (packets.get(0).getSeq() + packets.get(0).getLength()))) {
                             //Update ack number
-                            ack += reldat_recvpacket.getLength();
+                            ack += res_packet.getLength();
                             //Remove the first packet as it is sent successfully
                             packets.remove(0);
                             //Reset retry variable
@@ -336,14 +324,14 @@ public class RELDAT_Socket {
                                 System.out.println("No new packet to send");
                             }
                             //If some acks are lost, assume sent data are already received based on the last ack received
-                        } else if (ack < reldat_recvpacket.getSeq()) {
+                        } else if (ack < res_packet.getSeq()) {
                             if(debug == 1) {
-                                System.out.println("ACK packet loss detected!");
+                                System.out.println("<------ACK packet loss detected!-------->");
                             }
                             //Update the ack number
-                            ack = reldat_recvpacket.getSeq() + reldat_recvpacket.getLength();
+                            ack = res_packet.getSeq() + res_packet.getLength();
                             //Need to send multiple packets
-                            while (packets.get(0).getSeq() < reldat_recvpacket.getAck()) {
+                            while (packets.get(0).getSeq() < res_packet.getAck()) {
                                 //Remove the first packet
                                 packets.remove(0);
                                 //Check if there is any packet left
@@ -362,13 +350,13 @@ public class RELDAT_Socket {
                             }
                             //If there's a packet loss. Wait until 3 duplicated acks are received to start retransmitting
                             // or time out and retransmit
-                        } else if ((ack == reldat_recvpacket.getSeq()) &&
-                                (reldat_recvpacket.getAck() == (packets.get(0).getSeq()))){
-                            ack += reldat_recvpacket.getLength();
+                        } else if ((ack == res_packet.getSeq()) &&
+                                (res_packet.getAck() == (packets.get(0).getSeq()))){
+                            ack += res_packet.getLength();
                             lossDetector++;
                             if(lossDetector > 2) {
                                 if(debug == 1) {
-                                    System.out.println("Packet loss detected");
+                                    System.out.println("<------Packet loss detected------->");
                                 }
                                 break;
                             }
@@ -406,46 +394,50 @@ public class RELDAT_Socket {
         String filename ="";
         FileOutputStream fos = null;
         StringBuilder str = new StringBuilder();
+        byte[] buffer;
+        DatagramPacket p;
+        boolean success = false;
         if(debug == 1) {
             System.out.println("Start receiving data....");
         }
         while(true) {
             try {
-                byte[] buffer = new byte[2 * MSS];
-                DatagramPacket p = new DatagramPacket(buffer, buffer.length);
+                buffer = new byte[2 * MSS];
+                p = new DatagramPacket(buffer, buffer.length);
                 s.receive(p);
-                RELDAT_Packet reldat_packet = Unpack(p);
+                res_packet = Unpack(p);
+
                 //If correct packet is received
-                if (reldat_packet.getSeq() == ack) {
+                if (res_packet.getSeq() == ack) {
                     //Update ack number for the next packet
-                    ack += reldat_packet.getLength();
+                    ack += res_packet.getLength();
                     //If the packet has data that need to store
-                    if ((reldat_packet.getType() == RELDAT_Packet.TYPE.DATA) ||
-                        (reldat_packet.getType() == RELDAT_Packet.TYPE.PUSH)) {
+                    if ((res_packet.getType() == RELDAT_Packet.TYPE.DATA) ||
+                        (res_packet.getType() == RELDAT_Packet.TYPE.PUSH)) {
                         //Print debug info
                         if (debug == 1) {
-                            if (reldat_packet.getType() == RELDAT_Packet.TYPE.FIN){
+                            if (res_packet.getType() == RELDAT_Packet.TYPE.FIN){
                                 System.out.println("Disconnect request received!");
-                            } else if (reldat_packet.getType() == RELDAT_Packet.TYPE.DATA){
-                                System.out.println("Packet(#" + reldat_packet.getSeq() + ") is received");
+                            } else if (res_packet.getType() == RELDAT_Packet.TYPE.DATA){
+                                System.out.println("Packet(#" + res_packet.getSeq() + ") is received");
                             }
                         }
                         //If the file is currently opened for writing. Then write the received data to the file
                         if (fos != null) {
                             if (debug == 1) {
-                                System.out.println("Write packet#" + reldat_packet.getSeq() + " to file");
+                                System.out.println("Write packet#" + res_packet.getSeq() + " to file");
                             }
-                            fos.write(reldat_packet.getData(), 0, reldat_packet.getLength());
+                            fos.write(res_packet.getData(), 0, res_packet.getLength());
                         //Else, add it to the string buffer
                         } else {
-                            str.append(new String(reldat_packet.getData()));
+                            str.append(new String(res_packet.getData()));
                         }
                         //Send ACK of the received packet
                         if (debug == 1) {
-                            if(reldat_packet.getType() == RELDAT_Packet.TYPE.DATA) {
-                                System.out.println("Sending ACK for packet#" + reldat_packet.getSeq() + " and waiting for packet# " + ack);
+                            if(res_packet.getType() == RELDAT_Packet.TYPE.DATA) {
+                                System.out.println("Sending ACK for packet#" + res_packet.getSeq() + " and waiting for packet# " + ack);
                             } else {
-                                System.out.println("Sending ACK for packet#" + reldat_packet.getSeq());
+                                System.out.println("Sending ACK for packet#" + res_packet.getSeq());
                             }
                         }
                         buffer = new byte[1];
@@ -453,7 +445,7 @@ public class RELDAT_Socket {
                         seq += buffer.length;
 
                         //Decide what to do when last packet is received
-                        if (reldat_packet.getType() == RELDAT_Packet.TYPE.PUSH) {
+                        if (res_packet.getType() == RELDAT_Packet.TYPE.PUSH) {
                             if (debug == 1) {
                                 System.out.println("All Data are received!");
                             }
@@ -465,13 +457,14 @@ public class RELDAT_Socket {
                                     int j = msg.lastIndexOf('.');
                                     filename = msg.substring(i + 1, j) + "_received" + msg.substring(j);
                                     fos = new FileOutputStream(filename);
-                                    s.setSoTimeout(10000);
+                                    s.setSoTimeout(60000);
                                     if (debug == 1) {
                                         System.out.println("File transfer request is received.");
                                     }
                                 //Else, return the received message
                                 } else {
-                                    return msg;
+                                    success = true;
+                                    s.setSoTimeout(500);
                                 }
                                 continue;
                             //If the file is already opened for writing, close it
@@ -487,8 +480,13 @@ public class RELDAT_Socket {
                             break; // break out of the infinite loop
                         }
                     //If the sender request for disconnecting. Initiate disconnecting sequence
-                    } else if (reldat_packet.getType() == RELDAT_Packet.TYPE.FIN) {
+                    } else if (res_packet.getType() == RELDAT_Packet.TYPE.FIN) {
                         if (state == CONNECTION_STATE.ESTABLISHED) {
+                            if(debug == 1) {
+                                System.out.println("FIN Received!");
+                                System.out.println("Send ACK of FIN packet!");
+                                System.out.println("Connection state: ESTABLISHED --> CLOSE_WAIT");
+                            }
                             state = CONNECTION_STATE.CLOSE_WAIT;
                             disconnect();
                             throw new SocketException("Connection is closed");
@@ -496,8 +494,10 @@ public class RELDAT_Socket {
                     }
                 //If a packet lost happen send ACK for the last valid packet received
                 } else {
-                    if (debug == 1) {
-                        System.out.println("Wrong packet received! Expected packet#" + ack + ". Received packet#" + reldat_packet.getSeq());
+                    if(success && debug == 1) {
+                        System.out.println("<--------Duplicate packet detected!-------->");
+                    } else if (debug == 1) {
+                        System.out.println("Wrong packet received! Expected packet#" + ack + ". Received packet#" + res_packet.getSeq());
                     }
                     //Send ACK for the last in-order packet
                     buffer = new byte[1];
@@ -505,12 +505,14 @@ public class RELDAT_Socket {
                     seq += buffer.length;
                 }
             }catch (SocketTimeoutException e) {
-                if(debug == 1) {
+                if(!success && debug == 1) {
                     System.out.println("File transfer is failed!");
-                }
-                if(fos != null) {
-                    fos.flush();
-                    fos.close();
+                    if(fos != null) {
+                        fos.flush();
+                        fos.close();
+                    }
+                } else {
+                    return str.toString();
                 }
                 break;
             }
@@ -519,71 +521,72 @@ public class RELDAT_Socket {
     }
 
     public void disconnect() throws IOException, ClassNotFoundException{
-        RELDAT_Packet reldat_packet = null;
-        s.setSoTimeout(2000);
+        RELDAT_Packet reldat_fin_packet = null;
+        RELDAT_Packet reldat_ack_packet = null;
         byte[] buffer;
+        int retry = 0;
+        s.setSoTimeout(500);
+
         //Active disconnect
         if(state == CONNECTION_STATE.ESTABLISHED) {
             //Prepare FIN packet
             buffer = new byte[1];
-            reldat_packet = new RELDAT_Packet(buffer,buffer.length,seq,ack, RELDAT_Packet.TYPE.FIN,recvWndwn);
+            reldat_fin_packet = new RELDAT_Packet(buffer,buffer.length,seq,ack, RELDAT_Packet.TYPE.FIN,recvWndwn);
             seq+=buffer.length;
             state = CONNECTION_STATE.FIN_WAIT_1;
             if(debug == 1) {
                 System.out.println("Send FIN packet!");
                 System.out.println("Connection state: ESTABLISHED --> FIN_WAIT_1");
             }
-            s.send(Pack(reldat_packet));
+            s.send(Pack(reldat_fin_packet));
         //Passive disconnect
         } else if(state == CONNECTION_STATE.CLOSE_WAIT){
             //Send ACK of FIN packet
             buffer = new byte[1];
-            reldat_packet = new RELDAT_Packet(buffer,buffer.length,seq,ack, RELDAT_Packet.TYPE.ACK,recvWndwn);
+            reldat_ack_packet = new RELDAT_Packet(buffer,buffer.length,seq,ack, RELDAT_Packet.TYPE.ACK,recvWndwn);
             seq+=buffer.length;
-            if(debug == 1) {
-                System.out.println("Send ACK of FIN packet!");
-                System.out.println("Connection state: ESTABLISHED --> CLOSE_WAIT");
-            }
-            s.send(Pack(reldat_packet));
+            s.send(Pack(reldat_ack_packet));
 
             //Send FIN
-            buffer = new byte[1];
-            s.send(Pack(new RELDAT_Packet(buffer,buffer.length,seq,ack, RELDAT_Packet.TYPE.FIN,recvWndwn)));
-            state = CONNECTION_STATE.LAST_ACK;
             if(debug == 1) {
                 System.out.println("Send FIN packet!");
                 System.out.println("Connection State: CLOSE_WAIT --> LAST_ACK");
             }
-            s.send(Pack(reldat_packet));
+            buffer = new byte[1];
+            state = CONNECTION_STATE.LAST_ACK;
+            reldat_fin_packet = new RELDAT_Packet(buffer,buffer.length,seq,ack, RELDAT_Packet.TYPE.FIN,recvWndwn);
+            seq+= buffer.length;
+            s.send(Pack(reldat_fin_packet));
         }
-        while(true) {
+        while(state != CONNECTION_STATE.CLOSED) {
             try {
                 //Wait for ACK of FIN
                 buffer = new byte[MSS];
                 DatagramPacket res = new DatagramPacket(buffer, buffer.length);
                 s.receive(res);
-                RELDAT_Packet reldat_res = Unpack(res);
-                if (reldat_res.getSeq() == ack) {
+                res_packet = Unpack(res);
+
+                if (res_packet.getSeq() == ack) {
                     //If ACK of FIN is received
-                    ack += reldat_res.getLength();
-                    if (reldat_res.getType() == RELDAT_Packet.TYPE.ACK) {
+                    retry = 0;
+                    ack += res_packet.getLength();
+                    if (res_packet.getType() == RELDAT_Packet.TYPE.ACK) {
                         if(debug == 1) {
                             System.out.println("ACK of FIN received!");
                         }
                         if (state == CONNECTION_STATE.LAST_ACK) {
                             if(debug == 1) {
                                 System.out.println("Connection State: LAST_ACK --> CLOSED");
+                                System.out.println("-----------------------------------");
                             }
-                            state = CONNECTION_STATE.CLOSED;
-                            return;
+                            state = CONNECTION_STATE.CLOSED; //--> End loop
                         } else if (state == CONNECTION_STATE.FIN_WAIT_1) {
                             if(debug == 1) {
                                 System.out.println("Connection State: FIN_WAIT_1 --> FIN_WAIT_2");
                             }
                             state = CONNECTION_STATE.FIN_WAIT_2;
-                            continue;
                         }
-                    } else if (reldat_res.getType() == RELDAT_Packet.TYPE.FIN) {
+                    } else if (res_packet.getType() == RELDAT_Packet.TYPE.FIN) {
                         if(debug == 1) {
                             System.out.println("FIN received!");
                         }
@@ -594,28 +597,58 @@ public class RELDAT_Socket {
                             state = CONNECTION_STATE.TIME_WAIT;
                             //Send ack for this fin
                             buffer = new byte[1];
-                            reldat_packet = new RELDAT_Packet(buffer, buffer.length, seq, ack, RELDAT_Packet.TYPE.ACK, recvWndwn);
+                            reldat_ack_packet = new RELDAT_Packet(buffer, buffer.length, seq, ack, RELDAT_Packet.TYPE.ACK, recvWndwn);
                             seq += buffer.length;
-                            s.send(Pack(reldat_packet));
-                        } else {
-                            s.send(Pack(reldat_packet));
+                            s.send(Pack(reldat_ack_packet));
                         }
+                    }
+                } else if(res_packet.getType() == RELDAT_Packet.TYPE.FIN) {
+                    //If ACK of FIN is lost, but received FIN.
+                    if(state == CONNECTION_STATE.FIN_WAIT_1) {
+                        if(debug == 1) {
+                            System.out.println("<---Expect ACK of FIN. Received FIN--->");
+                            System.out.println("Connection State: FIN_WAIT_1 --> FIN_WAIT_2");
+                            System.out.println("Send ACK of FIN!");
+                            System.out.println("Connection State: FIN_WAIT_2 --> TIME_WAIT");
+                        }
+                        ack = res_packet.getSeq() + res_packet.getLength();
+                        buffer = new byte[1];
+                        reldat_ack_packet = new RELDAT_Packet(buffer, buffer.length, seq, ack, RELDAT_Packet.TYPE.ACK, recvWndwn);
+                        seq += buffer.length;
+                        s.send(Pack(reldat_ack_packet));
+
+                        state = CONNECTION_STATE.TIME_WAIT;
+                    } else {
+                        if(debug == 1) {
+                            System.out.println("FIN is lost");
+                        }
+                        s.send(Pack(reldat_ack_packet));
+                        s.send(Pack(reldat_fin_packet));
                     }
                 }
             } catch (SocketTimeoutException e) {
                 if(state == CONNECTION_STATE.TIME_WAIT) {
                     if (debug == 1) {
+                        System.out.println("Time's up! Disconnecting.....");
                         System.out.println("Connection State: TIME_WAIT -> CLOSED");
+                        System.out.println("-----------------------------------");
                     }
                     state = CONNECTION_STATE.CLOSED;
                     return;
-                } else {
-                    buffer = new byte[1];
-                    s.send(Pack(new RELDAT_Packet(buffer,buffer.length,seq,ack, RELDAT_Packet.TYPE.FIN,recvWndwn)));
+                }else if(state == CONNECTION_STATE.LAST_ACK) {
+                    //Resend FIN packet
+                    if(debug == 1) {
+                        System.out.println("Timeout! Resend FIN!!");
+                    }
+                    s.send(Pack(reldat_fin_packet));
+                    retry++;
+                } else if(retry > 3) {
+                    System.out.println("No response from the client. The connection will be closed!");
+                    state = CONNECTION_STATE.CLOSED;
+                    return;
                 }
             }
         }
-
     }
     /**
      * Constructor
@@ -628,5 +661,6 @@ public class RELDAT_Socket {
         ack = 0;
         state = CONNECTION_STATE.CLOSED;
         this.debug = debug;
+        res_packet = null;
     }
 }

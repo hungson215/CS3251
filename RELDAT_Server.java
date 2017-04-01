@@ -18,7 +18,7 @@ public class RELDAT_Server {
             System.out.println("Server started: " + Inet4Address.getLocalHost() + ":" + s.getPort());
             System.out.println("Waiting for connection request");
             s.accept();
-            System.out.println("Connection established!");
+            System.out.println("The connection is established!");
             while(true) {
                 try {
                     String res = s.receive();
