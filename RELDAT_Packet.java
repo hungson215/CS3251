@@ -1,4 +1,7 @@
-import java.io.Serializable;
+import java.io.*;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.util.zip.CRC32;
 
 
 public class RELDAT_Packet implements Serializable {
@@ -8,6 +11,7 @@ public class RELDAT_Packet implements Serializable {
     private TYPE type;
     private int wndwn;
     private byte[] data;
+    private int checksum;
 
     //Packet type
     public enum TYPE {DATA,SYN,SYNACK,ACK,PUSH,FIN}
@@ -67,5 +71,36 @@ public class RELDAT_Packet implements Serializable {
 
     public void setData(byte[] data) {
         this.data = data;
+    }
+
+    public int getChecksum() { return checksum;}
+
+    private byte[] getPacketByteArray() throws IOException {
+        byte[] packetByteArray;
+        ByteBuffer buffer = ByteBuffer.allocate(Integer.BYTES * 4);
+        buffer.order(ByteOrder.BIG_ENDIAN);
+        buffer.putInt(seq);
+        buffer.putInt(ack);
+        buffer.putInt(length);
+        buffer.putInt(wndwn);
+        packetByteArray = buffer.array();
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        ObjectOutputStream outputStream = new ObjectOutputStream(output);
+        outputStream.write(packetByteArray);
+        outputStream.writeObject(type);
+        outputStream.write(data);
+        outputStream.flush();
+        return output.toByteArray();
+
+    }
+
+    public int calculateChecksum() throws IOException {
+        CRC32 checksum = new CRC32();
+        checksum.update(getPacketByteArray());
+        return (int) checksum.getValue();
+    }
+
+    public void setChecksum() throws IOException {
+        this.checksum = calculateChecksum();
     }
 }
