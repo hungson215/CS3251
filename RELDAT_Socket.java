@@ -368,6 +368,8 @@ public class RELDAT_Socket {
                         if(debug == 1) {
                             System.out.println("Failed to transfer the file");
                         }
+                        seq = packets.get(0).getSeq();
+                        packets.clear();
                         return;
                     }
                     if(debug == 1) {
@@ -481,16 +483,38 @@ public class RELDAT_Socket {
                         }
                     //If the sender request for disconnecting. Initiate disconnecting sequence
                     } else if (res_packet.getType() == RELDAT_Packet.TYPE.FIN) {
-                        if (state == CONNECTION_STATE.ESTABLISHED) {
-                            if(debug == 1) {
-                                System.out.println("FIN Received!");
-                                System.out.println("Send ACK of FIN packet!");
-                                System.out.println("Connection state: ESTABLISHED --> CLOSE_WAIT");
-                            }
-                            state = CONNECTION_STATE.CLOSE_WAIT;
-                            disconnect();
-                            throw new SocketException("Connection is closed");
+                        if(debug == 1) {
+                            System.out.println("FIN Received!");
                         }
+                        if(fos != null) {
+                            if(debug == 1) {
+                                System.out.println("File transfer is failed because the sender requested for disconnection!");
+                            }
+                            try {
+                                File f = new File(filename);
+                                if(f.delete()) {
+                                    if(debug == 1) {
+                                        System.out.println("Deleted the incomplete file. Disconnecting....");
+                                    }
+                                } else {
+                                    if(debug == 1) {
+                                        System.out.println("Disconnecting....");
+                                    }
+                                }
+                            } catch (Exception e) {
+                                System.out.println("Disconnecting....");
+                            }
+                            fos.flush();
+                            fos.close();
+                            fos = null;
+                        }
+                        if(debug == 1) {
+                            System.out.println("Send ACK of FIN packet!");
+                            System.out.println("Connection state: ESTABLISHED --> CLOSE_WAIT");
+                        }
+                        state = CONNECTION_STATE.CLOSE_WAIT;
+                        disconnect();
+                        throw new SocketException("Connection is closed");
                     }
                 //If a packet lost happen send ACK for the last valid packet received
                 } else {
@@ -635,17 +659,19 @@ public class RELDAT_Socket {
                     }
                     state = CONNECTION_STATE.CLOSED;
                     return;
-                }else if(state == CONNECTION_STATE.LAST_ACK) {
+                } else if(retry > 3) {
+                    if(debug == 1) {
+                        System.out.println("No response from the client. The connection will be closed!");
+                    }
+                    state = CONNECTION_STATE.CLOSED;
+                    return;
+                } else {
                     //Resend FIN packet
                     if(debug == 1) {
                         System.out.println("Timeout! Resend FIN!!");
                     }
                     s.send(Pack(reldat_fin_packet));
                     retry++;
-                } else if(retry > 3) {
-                    System.out.println("No response from the client. The connection will be closed!");
-                    state = CONNECTION_STATE.CLOSED;
-                    return;
                 }
             }
         }
