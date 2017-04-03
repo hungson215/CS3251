@@ -31,12 +31,12 @@ public class RELDAT_Socket {
      */
     private DatagramPacket Pack(RELDAT_Packet data) throws IOException{
         //Convert an object to byte array
+        data.setChecksum();
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         ObjectOutputStream oos = new ObjectOutputStream(baos);
         oos.writeObject(data);
         oos.flush();
         byte[] output = baos.toByteArray();
-
         return new DatagramPacket(output, output.length, remoteAddr, remotePort);
     }
 
@@ -229,7 +229,6 @@ public class RELDAT_Socket {
                 } else {
                     System.out.println("Closing the connection");
                     state = CONNECTION_STATE.CLOSED;
-                    throw new IOException("Can't connect to the server");
                 }
             }
         }
@@ -386,7 +385,7 @@ public class RELDAT_Socket {
                         }
                         seq = packets.get(0).getSeq();
                         packets.clear();
-                        return;
+                        throw new SocketException("Failed to transfer.");
                     }
                     if(debug == 1) {
                         System.out.println("Time out. Try to resend");
@@ -551,10 +550,10 @@ public class RELDAT_Socket {
                         fos.flush();
                         fos.close();
                     }
+                    throw new SocketException("File failed to transfer");
                 } else {
                     return str.toString();
                 }
-                break;
             }
         }
         return filename;
@@ -606,7 +605,7 @@ public class RELDAT_Socket {
                 s.receive(res);
                 res_packet = Unpack(res);
 
-                if (res_packet.getSeq() == ack) {
+                if (validatePacket(res_packet) && res_packet.getSeq() == ack) {
                     //If ACK of FIN is received
                     retry = 0;
                     ack += res_packet.getLength();
@@ -642,7 +641,7 @@ public class RELDAT_Socket {
                             s.send(Pack(reldat_ack_packet));
                         }
                     }
-                } else if(res_packet.getType() == RELDAT_Packet.TYPE.FIN) {
+                } else if(validatePacket(res_packet) && res_packet.getType() == RELDAT_Packet.TYPE.FIN) {
                     //If ACK of FIN is lost, but received FIN.
                     if(state == CONNECTION_STATE.FIN_WAIT_1) {
                         if(debug == 1) {

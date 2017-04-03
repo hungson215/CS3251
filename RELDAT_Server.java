@@ -1,3 +1,4 @@
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -6,10 +7,9 @@ import java.net.SocketException;
 
 public class RELDAT_Server {
     public static void main(String[] args) throws NumberFormatException, IOException,ClassNotFoundException{
-        RELDAT_Socket s;
         if(args.length != 2){
             System.out.println("Usage: reldat_server [port] [recvWindow]");
-            return;
+            System.exit(0);
         } else {
             int port = Integer.parseInt(args[0]);
             if (port <= 1024 && (port >= 65535)) {
@@ -21,37 +21,43 @@ public class RELDAT_Server {
                 System.out.println("window can't be lower than 1");
                 System.exit(0);
             }
-            s = new RELDAT_Socket(port,1);
-            s.setRecvWndwn(recvWndwn);
-        }
-        int bytecount;
-        while(true) {
-            System.out.println("Server started: " + Inet4Address.getLocalHost() + ":" + s.getPort());
-            System.out.println("Waiting for connection request");
-            s.accept();
-            System.out.println("The connection is established!");
-            while(true) {
-                try {
-                    String res = s.receive();
-                    FileInputStream recievedText = new FileInputStream(res);
-                    byte[] byteText = new byte[1000];
-                    String sending = "";
-                    while ((bytecount = recievedText.read(byteText, 0, 1000)) != -1) {
-                        sending += new String(byteText).toUpperCase();
+            try {
+                RELDAT_Socket s = new RELDAT_Socket(port, 1);
+                s.setRecvWndwn(recvWndwn);
+
+
+                int bytecount;
+                while (true) {
+                    System.out.println("Server started: " + Inet4Address.getLocalHost() + ":" + s.getPort());
+                    System.out.println("Waiting for connection request");
+                    s.accept();
+                    System.out.println("The connection is established!");
+                    while (true) {
+                        try {
+                            String res = s.receive();
+                            FileInputStream recievedText = new FileInputStream(res);
+                            byte[] byteText = new byte[1000];
+                            String sending = "";
+                            while ((bytecount = recievedText.read(byteText, 0, 1000)) != -1) {
+                                sending += new String(byteText).toUpperCase();
+                            }
+                            recievedText.close();
+                            FileOutputStream sendFile = new FileOutputStream(res);
+                            sendFile.write(sending.getBytes());
+                            sendFile.close();
+                            s.send(res);
+
+                        } catch (SocketException e) {
+                            System.out.println("Client disconnected");
+                            break;
+                        } catch (IOException e) {
+                            System.out.println("File not given");
+                            break;
+                        }
                     }
-                    recievedText.close();
-                    FileOutputStream sendFile = new FileOutputStream(res);
-                    sendFile.write(sending.getBytes());
-                    sendFile.close();
-                    s.send(res);
-                    /*
-                    if (res != null) {
-                        System.out.println("Client's message: " + res);
-                        s.send(res.toUpperCase());
-                    } */
-                }catch (SocketException e) {
-                    break;
                 }
+            } catch (SocketException e ) {
+                System.out.println("Could not create socket. exiting the program.");
             }
         }
     }

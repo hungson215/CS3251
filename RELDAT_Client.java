@@ -1,3 +1,4 @@
+import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.SocketException;
@@ -33,15 +34,31 @@ public class RELDAT_Client {
             while(true) {
                 System.out.print("Please enter your command:");
                 String inputs = scan.nextLine();
-                if (inputs.toLowerCase().startsWith("transform")) {
-                    String[] filename = inputs.split(" ");
-                    s.send(filename[1]);
-                    s.receive();
-                } else if(inputs.toLowerCase().startsWith("disconnect")) {
+                String[] commandsInputs = inputs.split(" ");
+                if (commandsInputs[0].equals("transform")) {
+                    File textInput = new File(commandsInputs[1]);
+                    if (commandsInputs[1].endsWith(".txt") && textInput.exists()) {
+                        try {
+                            s.send(commandsInputs[1]);
+                            String received = s.receive();
+                            if (received.contains("_received_received")) {
+                                File textFile = new File(received.replaceFirst("_received", ""));
+                                textFile.delete();
+                                File textFile2 = new File(received);
+                                textFile2.renameTo(textFile);
+                            }
+                        } catch (SocketException e) {
+                            System.out.println("Server did not respond existing out");
+                            break;
+                        }
+                    } else {
+                        System.out.println("File does not exist");
+                    }
+                } else if(commandsInputs[0].equals("disconnect")) {
                     s.disconnect();
                     break;
                 } else {
-                    System.out.println("Wrong inputs the commands are transform and disconnect.");
+                    System.out.println("Wrong inputs the commands are transform <filename.txt> and disconnect.");
                 }
             }
         }
