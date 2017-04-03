@@ -474,7 +474,7 @@ public class RELDAT_Socket {
                                     int j = msg.lastIndexOf('.');
                                     filename = msg.substring(i + 1, j) + "_received" + msg.substring(j);
                                     fos = new FileOutputStream(filename);
-                                    s.setSoTimeout(60000);
+                                    s.setSoTimeout(30000);
                                     if (debug == 1) {
                                         System.out.println("File transfer request is received.");
                                     }
