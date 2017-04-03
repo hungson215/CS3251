@@ -1,7 +1,4 @@
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
+import java.io.*;
 import java.net.Inet4Address;
 import java.net.SocketException;
 
@@ -36,14 +33,15 @@ public class RELDAT_Server {
                         try {
                             String res = s.receive();
                             FileInputStream recievedText = new FileInputStream(res);
-                            byte[] byteText = new byte[1000];
-                            String sending = "";
-                            while ((bytecount = recievedText.read(byteText, 0, 1000)) != -1) {
-                                sending += new String(byteText).toUpperCase();
+                            String sending;
+                            BufferedReader readFile = new BufferedReader(new FileReader(res));
+                            String updated = "";
+                            while ((sending = readFile.readLine()) != null) {
+                                updated += sending.toUpperCase() + "\n";
                             }
                             recievedText.close();
                             FileOutputStream sendFile = new FileOutputStream(res);
-                            sendFile.write(sending.getBytes());
+                            sendFile.write(updated.getBytes());
                             sendFile.close();
                             s.send(res);
 
